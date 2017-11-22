@@ -58,13 +58,26 @@ def prob_diff_bivariate_poisson(lambda1, lambda2, z):
 # Convention is (Team1,Team2) is (row,col) despite using x,y notation below.
 # I have validated this for default params against tabulated results in the BVP slides at
 # http://www2.stat-athens.aueb.gr/~karlis/Bivariate%20Poisson%20Regression.pdf
-# FIXME renormalize
 def build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10):
   joint_prob = np.zeros([nmax,nmax])
   for x in xrange(nmax):
     for y in xrange(nmax):
       joint_prob[x,y] = prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y)
-  return joint_prob
+  return joint_prob/np.sum(joint_prob)
+
+
+# Sample from a table of BVP probabilities. Since numpy/scipy don't support
+# randomly-sampling 2D pmfs, work some modulus magic. Reshaping every time
+# might be slow, so could return array of samples or pass pre-shaped table.
+def scores_bivariate_poisson(prob_table):
+  n  = prob_table.shape[0]
+  n2 = prob_table.size
+  tab1d = prob_table.reshape(n2)
+  sample = np.random.choice(range(n2), p=tab1d)
+  s1 = sample//n
+  s2 = sample%n
+  print sample, s1, s2
+  return s1, s2
 
 
 # (Currently skeleton) code for various regressions.
@@ -124,7 +137,9 @@ def generate_test_scores(lambda0, lambda1, lambda2):
 #data = read_year_data(1998)
 #data = read_match_data()
 
-generate_test_scores(0.1,1.0,0.9)
+#generate_test_scores(0.1,1.0,0.9)
+tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
+scores_bivariate_poisson(tab)
 
 
 
