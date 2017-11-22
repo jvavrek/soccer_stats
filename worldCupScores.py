@@ -11,14 +11,19 @@ import scipy.misc
 import pandas as pd
 import matplotlib.pyplot as plt
 
-dropboxDir = '/Users/jvavrek/Dropbox (MIT)/Class Project/Project Data/rawdata/'
+dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/rawdata/'
 
 # Dictionary for year : location string
-yearDict = {2014:'brazil', 2010:'southafrica', 2006:'germany', 2002:'koreajapan', 1998:'france'}
+hostDict = {2014:'brazil', 2010:'southafrica', 2006:'germany', 2002:'koreajapan', 1998:'france'}
 
 # Function to read data
 def read_year_data(year):
-  data = pd.read_csv(dropboxDir+'%s'%yearDict[year]+'%d'%year+'.csv')
+  data = pd.read_csv(dropboxDir+'%s'%hostDict[year]+'%d'%year+'.csv')
+  return data
+
+
+def read_match_data():
+  data = pd.read_csv(dropboxDir+'all_match_outcomes.csv')
   return data
 
 
