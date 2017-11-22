@@ -2,26 +2,26 @@
 # Jayson Vavrek et al, 2017
 
 import sys
-import csv
-import math
-import time
 import numpy as np
 import scipy as sp
 import scipy.misc
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn import linear_model
 
-dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/rawdata/'
+# Hardcoded (!) path to project data
+dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/'
 
 # Dictionary for year : location string
 hostDict = {2014:'brazil', 2010:'southafrica', 2006:'germany', 2002:'koreajapan', 1998:'france'}
 
-# Function to read data
+# Function to read data set for the World Cup of a given year
 def read_year_data(year):
   data = pd.read_csv(dropboxDir+'%s'%hostDict[year]+'%d'%year+'.csv')
   return data
 
 
+# Function to read data set containing all the individual match data
 def read_match_data():
   data = pd.read_csv(dropboxDir+'all_match_outcomes.csv')
   return data
@@ -55,6 +55,29 @@ def build_bivariate_poisson_table(lambda0, lambda1, lambda2, nmax=10):
       joint_prob[x,y] = prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y)
   return joint_prob
 
+
+# (Currently skeleton) code for various regressions.
+# Ideally the way this should work is if scoreMatrix is nx2, this should regress on the BVP;
+# if scoreMatrix is nx1 (for score _differences_), it should regress on the diffBVP;
+# should also be able to regress (for both cases) on the independent Poisson model
+# This means the heavy lifting of slicing the dataframe should be done in another function.
+#                  BVP   IP
+# scoreMatrix      nx2  nx1
+# parameters out     3    2
+def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
+  reg = None
+  if opt == 'linear':
+    reg = linear_model.LinearRegression()
+  elif opt == 'ridge':
+    reg = linear_model.Ridge(alpha=alpha)
+  elif opt == 'lasso':
+    reg = linear_model.Lasso(alpha=alpha)
+  else:
+    print "Error: bad option %s"%opt
+
+  reg.fit(featureMatrix, scoreMatrix) # FIXME can pass n_jobs parameter > 1 if too slow
+  return reg
+
 # TODO:
 # Understand different parameters better
 # Use the BVP to predict the winner of a game
@@ -64,7 +87,8 @@ def build_bivariate_poisson_table(lambda0, lambda1, lambda2, nmax=10):
 #t = build_bivariate_poisson_table(0.2,2.1,3.2)
 #print t
 
-data = read_year_data(1998)
+#data = read_year_data(1998)
+data = read_match_data()
 
 
 
