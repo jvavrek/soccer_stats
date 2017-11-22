@@ -10,6 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import linear_model
 
+np.set_printoptions(precision=3, linewidth=180)
+
 # Hardcoded (!) path to project data
 dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/'
 
@@ -53,7 +55,11 @@ def prob_diff_bivariate_poisson(lambda1, lambda2, z):
 
 
 # Build a table of BVP probabilities if necessary
-def build_bivariate_poisson_table(lambda0, lambda1, lambda2, nmax=10):
+# Convention is (Team1,Team2) is (row,col) despite using x,y notation below.
+# I have validated this for default params against tabulated results in the BVP slides at
+# http://www2.stat-athens.aueb.gr/~karlis/Bivariate%20Poisson%20Regression.pdf
+# FIXME renormalize
+def build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10):
   joint_prob = np.zeros([nmax,nmax])
   for x in xrange(nmax):
     for y in xrange(nmax):
@@ -88,7 +94,7 @@ def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
 # NOTE: The regression should return log(lambda). As a result, using the predict()
 # method might not work.
 def get_lambda_params(regression):
-   params = regression.get_params()
+  params  = regression.get_params()
   nparams = len(params)
 
   if nparams == 2: # independent Poisson
@@ -98,6 +104,12 @@ def get_lambda_params(regression):
   else:
     print "Error: bad number of parameters %d"%nparams
     return None
+
+
+def generate_test_scores(lambda0, lambda1, lambda2):
+  tab = build_bivariate_poisson_table(lambda0, lambda1, lambda2)
+  print tab
+
 
 # TODO:
 # Understand different parameters better
@@ -110,7 +122,9 @@ def get_lambda_params(regression):
 #print t
 
 #data = read_year_data(1998)
-data = read_match_data()
+#data = read_match_data()
+
+generate_test_scores(0.1,1.0,0.9)
 
 
 
