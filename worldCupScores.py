@@ -129,6 +129,7 @@ def get_lambda_params(regression):
     return None
 
 
+# Build and slice the datasets for the score_regression() function.
 def build_matrices(diff=False):
   fm = Create_Feature_Matrix(dropboxDir, 
                              match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
@@ -151,6 +152,19 @@ def build_matrices(diff=False):
 
   return fm, sm
 
+
+# Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
+# to obtain the seeds, then creates brackets based on those seeds. Top 4 (?) teams
+# are 'protected' and don't play each other, rest are placed randomly.
+def create_tournament_seeds(featureMatrix):
+  pass
+
+
+# Perform the full tournament simulation. Need to look into details, but this should
+# involve group play followed by elimination rounds. For each matchup, use the model
+# to predict the score, and advance the winning teams until we have a winner.
+def simulate_tournament():
+  pass
 
 #tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
 #scores_bivariate_poisson(tab)
