@@ -1,6 +1,12 @@
 # 6.439 final project: predicting the winner of the World Cup 2018
 # Jayson Vavrek et al, 2017
 
+# TODO:
+# Use the BVP to predict the winner of a game
+# Build a tournament structure table and propagate
+# MC sample initial distribution
+# Better error handling?
+
 import sys
 import numpy as np
 import scipy as sp
@@ -19,13 +25,15 @@ dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/'
 # Dictionary for year : location string
 hostDict = {2014:'brazil', 2010:'southafrica', 2006:'germany', 2002:'koreajapan', 1998:'france'}
 
-# Function to read data set for the World Cup of a given year
+# Function to read data set for the World Cup of a given year.
+# Superseded by Create_Feature_Matrix().
 def read_year_data(year):
   data = pd.read_csv(dropboxDir+'%s'%hostDict[year]+'%d'%year+'.csv')
   return data
 
 
-# Function to read data set containing all the individual match data
+# Function to read data set containing all the individual match data.
+# Superseded by Create_Feature_Matrix().
 def read_match_data():
   data = pd.read_csv(dropboxDir+'all_match_outcomes.csv')
   return data
@@ -47,7 +55,8 @@ def prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y):
 
 
 # FIXME unsure if this uses the marginal means or actual parameters.
-# Seems to use actual parameters
+# Seems to use actual parameters.
+# Needs validation. (Don't we all...)
 def prob_diff_bivariate_poisson(lambda1, lambda2, z):
   factor1 = np.exp(-(lambda1+lambda2))
   factor2 = np.pow((lambda1/lambda2),z/2.0)
@@ -55,7 +64,7 @@ def prob_diff_bivariate_poisson(lambda1, lambda2, z):
   return factor1 * factor2 * factor3
 
 
-# Build a table of BVP probabilities if necessary
+# Build a table of BVP probabilities if necessary.
 # Convention is (Team1,Team2) is (row,col) despite using x,y notation below.
 # I have validated this for default params against tabulated results in the BVP slides at
 # http://www2.stat-athens.aueb.gr/~karlis/Bivariate%20Poisson%20Regression.pdf
@@ -120,29 +129,6 @@ def get_lambda_params(regression):
     return None
 
 
-def generate_test_scores(lambda0, lambda1, lambda2):
-  tab = build_bivariate_poisson_table(lambda0, lambda1, lambda2)
-  print tab
-
-
-# TODO:
-# Understand different parameters better
-# Use the BVP to predict the winner of a game
-# Build a tournament structure table and propagate
-# MC sample initial distribution
-# Better error handling?
-
-#t = build_bivariate_poisson_table(0.2,2.1,3.2)
-#print t
-
-#data = read_year_data(1998)
-#data = read_match_data()
-
-#generate_test_scores(0.1,1.0,0.9)
-#tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
-#scores_bivariate_poisson(tab)
-
-
 def build_matrices(diff=False):
   fm = Create_Feature_Matrix(dropboxDir, 
                              match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
@@ -161,9 +147,13 @@ def build_matrices(diff=False):
                                                      'cohesion', 
                                                      'dist', 
                                                      'cohesion sans 1'])
-  sm = None # FIXME left off here. Build score matrix; return differences of scores (home-away) if diff==True
+  sm = None # FIXME left off here. Build score matrix; return differences of scores (home-away) if diff==True. Need properly formatted scores.
 
   return fm, sm
+
+
+#tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
+#scores_bivariate_poisson(tab)
 
 
 
