@@ -156,6 +156,10 @@ def build_matrices(diff=False):
 # Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
 # to obtain the seeds, then creates brackets based on those seeds. Top 4 (?) teams
 # are 'protected' and don't play each other, rest are placed randomly.
+# NOTE: real draw for 2018 takes place Dec 1! Though, they might not do it randomly:
+# https://www.si.com/soccer/2017/11/14/world-cup-group-draw-pots-russia-2018
+# Could use random vs deterministic to infer how much of an advantage it is to be
+# one of the 'protected' seeds, especially the host nation.
 def create_tournament_seeds(featureMatrix):
   pass
 
