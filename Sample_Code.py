@@ -1,8 +1,8 @@
 from project_functions import Create_Feature_Matrix
 
-directory = "~/Dropbox (MIT)/Courses/Fall 2017/6.439/Class Project/Project Data/"
+directory = "/Users/anjian/Dropbox (MIT)/Courses/Fall 2017/6.439/Class Project/Project Data/"
 
-match_data_file_location = "~/Dropbox (MIT)/Courses/Fall 2017/6.439/Class Project/Project Data/all_match_outcomes.csv" 
+match_data_file_location = "/Users/anjian/Dropbox (MIT)/Courses/Fall 2017/6.439/Class Project/Project Data/all_match_outcomes.csv" 
 Create_Feature_Matrix(directory, 
                       match_data_file_location = match_data_file_location,
                       years = [2014,2010,2006,2002],
