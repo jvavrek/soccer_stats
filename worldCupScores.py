@@ -9,6 +9,7 @@ import scipy.special
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import linear_model
+from project_functions import Create_Feature_Matrix
 
 np.set_printoptions(precision=3, linewidth=180)
 
@@ -86,7 +87,7 @@ def scores_bivariate_poisson(prob_table):
 # should also be able to regress (for both cases) on the independent Poisson model
 # This means the heavy lifting of slicing the dataframe should be done in another function.
 #                  BVP   IP  BVPD
-# scoreMatrix      nx2  nx2   nx1
+# scoreMatrix in   nx2  nx2   nx1
 # parameters out     3    2     2
 def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
   reg = None
@@ -99,7 +100,7 @@ def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
   else:
     print "Error: bad option %s"%opt
 
-  reg.fit(featureMatrix, scoreMatrix) # FIXME can pass n_jobs parameter > 1 if too slow
+  reg.fit(featureMatrix, scoreMatrix) # NOTE can pass n_jobs parameter > 1 if too slow
   return reg
 
 
@@ -138,8 +139,32 @@ def generate_test_scores(lambda0, lambda1, lambda2):
 #data = read_match_data()
 
 #generate_test_scores(0.1,1.0,0.9)
-tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
-scores_bivariate_poisson(tab)
+#tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
+#scores_bivariate_poisson(tab)
+
+
+def build_matrices(diff=False):
+  fm = Create_Feature_Matrix(dropboxDir, 
+                             match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
+                             years = [2014,2010,2006,2002],
+                             features_to_consider = ['Matches Played',
+                                                     'Yellow_Per_Game_Avg', 
+                                                     'YellowRed_Per_Game_Avg',
+                                                     'Red_Per_Game_Avg', 
+                                                     'Goal_Per_Game_Avg', 
+                                                     'Goal_Against_Per_Game_Avg',
+                                                     'PenGoal_Per_Game_Avg',
+                                                     'FIFA rank',
+                                                     'seed',
+                                                     'host',
+                                                     'stars',
+                                                     'cohesion', 
+                                                     'dist', 
+                                                     'cohesion sans 1'])
+  sm = None # FIXME left off here. Build score matrix; return differences of scores (home-away) if diff==True
+
+  return fm, sm
+
 
 
 
