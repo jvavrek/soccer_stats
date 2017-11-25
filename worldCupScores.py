@@ -110,10 +110,16 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
 
   featureMatrix, scoreMatrix = features.values, scores.values
 
-  reg.fit(featureMatrix, scoreMatrix) # NOTE can pass n_jobs parameter > 1 if too slow
+  reg.fit(featureMatrix, scoreMatrix)
   print "Created %s model"%opt
   print "  variance explained: %.2f"%reg.score(featureMatrix,scoreMatrix)
   return reg
+
+
+# Compute the lambdas from reg coeffs betas and features ws of a single observation
+def compute_lambdas(betas, ws):
+  ll0, ll1, ll2 = np.dot(betas[0], ws[0]), np.dot(betas[1], ws[1]), np.dot(betas[2], ws[2])
+  return map(np.exp, [ll0, ll1, ll2])
 
 
 # Implementation of the EM algorithm as specified in the original BVP pdf.
@@ -127,13 +133,19 @@ def BVP_EM_algorithm(features, scores):
   lambda1 = 1.0 * np.ones(n_obs)
   lambda2 = 0.9 * np.ones(n_obs)
   svec = np.zeros(n_obs)
+  initBetas = np.ones(features.shape)
 
   # Define the likelihood function: the probability of observing the data given the model.
   # We would like to MAXIMIZE the likelihood in the M-step of BVP_EM_algorithm(), so we
-  # will MINIMIZE the negative log-likelihood. This is defined internally within
-  # BVP_EM_algorithm so that it can access scores without needing to define any globals.
-  def neg_log_likelihood(params):
-    pass
+  # will MINIMIZE the negative log-likelihood. This is defined internally within BVP_EM_algorithm
+  # so that it can access scores/features without needing to define any globals.
+  def neg_log_likelihood(betas):
+    nll = 0.0
+    for i in xrange(n_obs):
+      [xi,yi] = scores.iloc[i].values
+      lambdas = compute_lambdas(betas, features)
+      nll += -np.log(prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi, yi))
+    return nll
 
   #k = 0
   #converged = False
@@ -148,8 +160,8 @@ def BVP_EM_algorithm(features, scores):
       si = lambda0[i] * num / denom
     print si
 
-    # M-step requires a maximum likelihood computation I'm unsure about
-    results = minimize(regressLL, initParams, method='nelder-mead')
+    # M-step
+    results = minimize(neg_log_likelihood, initBetas, method='nelder-mead')
   #k += 1
 
 
