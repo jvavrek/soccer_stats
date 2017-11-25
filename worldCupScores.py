@@ -116,6 +116,12 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
   return reg
 
 
+# Define the likelihood function: the probability of observing the data given the model.
+# This is what we would like to MAXIMIZE in the M-step of BVP_EM_algorithm().
+def likelihood():
+  pass
+
+
 
 # Implementation of the EM algorithm as specified in the original BVP pdf.
 # Will need to think about this a bit more, since it requires a model for the
