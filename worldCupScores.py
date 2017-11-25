@@ -90,14 +90,14 @@ def scores_bivariate_poisson(prob_table):
   return s1, s2
 
 
-# (Currently skeleton) code for various regressions.
+# Code for various regressions.
 # Ideally the way this should work is if scoreMatrix is nx2, this should regress on the BVP;
 # if scoreMatrix is nx1 (for score _differences_), it should regress on the BVPD;
 # should also be able to regress (for both cases) on the independent Poisson model
 # This means the heavy lifting of slicing the dataframe should be done in another function.
 #                  BVP   IP  BVPD
 # scoreMatrix in   nx2  nx2   nx1
-# parameters out     3    2     2
+# reg parameters     3    2     2
 def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
   reg = None
   if opt == 'linear':
@@ -130,27 +130,36 @@ def get_lambda_params(regression):
 
 
 # Build and slice the datasets for the score_regression() function.
-def build_matrices(diff=False):
-  fm = Create_Feature_Matrix(dropboxDir, 
-                             match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
-                             years = [2014,2010,2006,2002],
-                             features_to_consider = ['Matches Played',
-                                                     'Yellow_Per_Game_Avg', 
-                                                     'YellowRed_Per_Game_Avg',
-                                                     'Red_Per_Game_Avg', 
-                                                     'Goal_Per_Game_Avg', 
-                                                     'Goal_Against_Per_Game_Avg',
-                                                     'PenGoal_Per_Game_Avg',
-                                                     'FIFA rank',
-                                                     'seed',
-                                                     'host',
-                                                     'stars',
-                                                     'cohesion', 
-                                                     'dist', 
-                                                     'cohesion sans 1'])
-  sm = None # FIXME left off here. Build score matrix; return differences of scores (home-away) if diff==True. Need properly formatted scores.
+standard_features = ['Matches Played',
+                     'Yellow_Per_Game_Avg', 
+                     'YellowRed_Per_Game_Avg',
+                     'Red_Per_Game_Avg', 
+                     'Goal_Per_Game_Avg', 
+                     'Goal_Against_Per_Game_Avg',
+                     'PenGoal_Per_Game_Avg',
+                     'FIFA rank',
+                     'seed',
+                     'host',
+                     'stars',
+                     'cohesion', 
+                     'dist', 
+                     'cohesion sans 1']
 
-  return fm, sm
+def build_matrices(diff=False):
+  m = Create_Feature_Matrix(dropboxDir, 
+                            match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
+                            years = [2014,2010,2006,2002],
+                            features_to_consider = standard_features)
+  m.dropna(inplace=True)
+  featureMatrix = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
+
+  scoreMatrix = None
+  if diff == True:
+    scoreMatrix = m['Score_Diff'].values
+  else:
+    scoreMatrix = m[['Score1','Score2']].values
+
+  return featureMatrix, scoreMatrix
 
 
 # Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
@@ -173,7 +182,10 @@ def simulate_tournament():
 #tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
 #scores_bivariate_poisson(tab)
 
-
+fm, sm = build_matrices()
+#reg = score_regression(fm, sm, opt='linear')
+#reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
+reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
 
 
 
