@@ -6,6 +6,7 @@
 # Build a tournament structure table and propagate
 # MC sample initial distribution
 # Better error handling?
+# Time profile?
 
 import sys
 import numpy as np
@@ -112,21 +113,6 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
   print "  variance explained: %.2f"%reg.score(featureMatrix,scoreMatrix)
   return reg
 
-
-# Wrapper function to get the lambda parameters from the regression, breaking them apart.
-# NOTE: The regression should return log(lambda). As a result, using the predict()
-# method might not work.
-def get_lambda_params(regression):
-  params  = regression.coef_
-  nparams = len(params)
-
-  if nparams == 2: # independent Poisson
-    return np.exp(params[0]), np.exp(params[1])
-  elif nparams == 3: # bivariate Poisson
-    return np.exp(params[0]), np.exp(params[1]), np.exp(params[2])
-  else:
-    print "Error: bad number of parameters %d"%nparams
-    return None
 
 
 # Implementation of the EM algorithm as specified in the original BVP pdf.
