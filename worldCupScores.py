@@ -110,6 +110,8 @@ def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
     print "Error: bad option %s"%opt
 
   reg.fit(featureMatrix, scoreMatrix) # NOTE can pass n_jobs parameter > 1 if too slow
+  print "Created %s model"%opt
+  print "  score: %.2f"%reg.score(featureMatrix,scoreMatrix)
   return reg
 
 
@@ -117,7 +119,7 @@ def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
 # NOTE: The regression should return log(lambda). As a result, using the predict()
 # method might not work.
 def get_lambda_params(regression):
-  params  = regression.get_params()
+  params  = regression.coef_
   nparams = len(params)
 
   if nparams == 2: # independent Poisson
@@ -182,7 +184,7 @@ def simulate_tournament():
 #tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
 #scores_bivariate_poisson(tab)
 
-fm, sm = build_matrices()
+fm, sm = build_matrices(diff=True)
 #reg = score_regression(fm, sm, opt='linear')
 #reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
 reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
