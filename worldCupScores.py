@@ -90,15 +90,11 @@ def scores_bivariate_poisson(prob_table):
   return s1, s2
 
 
-# Code for various regressions.
-# Ideally the way this should work is if scoreMatrix is nx2, this should regress on the BVP;
-# if scoreMatrix is nx1 (for score _differences_), it should regress on the BVPD;
-# should also be able to regress (for both cases) on the independent Poisson model
-# This means the heavy lifting of slicing the dataframe should be done in another function.
-#                  BVP   IP  BVPD
-# scoreMatrix in   nx2  nx2   nx1
-# reg parameters     3    2     2
-def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
+# Code for various _linear_ regressions. The heavy lifting of building the
+# input dataframes is done in build_dataframes.
+#   Input: features (nxp DataFrame), scores (nx2 or nx1 DataFrame), others
+#   Output: reg (linear_model object)
+def score_regression(features, scores, opt='linear', alpha=0.5):
   reg = None
   if opt == 'linear':
     reg = linear_model.LinearRegression()
@@ -109,9 +105,11 @@ def score_regression(featureMatrix, scoreMatrix, opt='linear', alpha=0.5):
   else:
     print "Error: bad option %s"%opt
 
+  featureMatrix, scoreMatrix = features.values, scores.values
+
   reg.fit(featureMatrix, scoreMatrix) # NOTE can pass n_jobs parameter > 1 if too slow
   print "Created %s model"%opt
-  print "  score: %.2f"%reg.score(featureMatrix,scoreMatrix)
+  print "  variance explained: %.2f"%reg.score(featureMatrix,scoreMatrix)
   return reg
 
 
@@ -131,7 +129,26 @@ def get_lambda_params(regression):
     return None
 
 
-# Build and slice the datasets for the score_regression() function.
+# Implementation of the EM algorithm as specified in the original BVP pdf.
+# Will need to think about this a bit more, since it requires a model for the
+# lambda as a function of the beta. Probably best to choose this model based on
+# the results of the linear/ridge/lasso regression as we discussed earlier.
+def BVP_EM_algorithm(featureMatrix, scoreMatrix):
+  # initial guesses for lambda parameters
+  lambda0 = 0.1
+  lambda1 = 1.0
+  lambda2 = 0.9
+
+  k = 0
+  converged = False
+  #while not converged:
+  #  for i in xrange(len(scoreMatrix)):
+  #    si = prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y)
+  #  k += 1
+
+
+# Build and slice the datasets for the score_regression()
+# and BVP_EM_algorithm() functions.
 standard_features = ['Matches Played',
                      'Yellow_Per_Game_Avg', 
                      'YellowRed_Per_Game_Avg',
@@ -147,21 +164,27 @@ standard_features = ['Matches Played',
                      'dist', 
                      'cohesion sans 1']
 
-def build_matrices(diff=False):
+def build_dataframes(diff=False):
   m = Create_Feature_Matrix(dropboxDir, 
                             match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
                             years = [2014,2010,2006,2002],
                             features_to_consider = standard_features)
   m.dropna(inplace=True)
-  featureMatrix = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
+  features = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
 
-  scoreMatrix = None
+  scores = None
   if diff == True:
-    scoreMatrix = m['Score_Diff'].values
+    scores = m['Score_Diff']
   else:
-    scoreMatrix = m[['Score1','Score2']].values
+    scores = m[['Score1','Score2']]
 
-  return featureMatrix, scoreMatrix
+  return features, scores
+
+
+# NOTE for later:
+#                  BVP   IP  BVPD
+# scoreMatrix in   nx2  nx2   nx1
+# reg parameters     3    2     2
 
 
 # Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
@@ -184,10 +207,10 @@ def simulate_tournament():
 #tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
 #scores_bivariate_poisson(tab)
 
-fm, sm = build_matrices(diff=True)
-#reg = score_regression(fm, sm, opt='linear')
+fm, sm = build_dataframes(diff=False)
+reg = score_regression(fm, sm, opt='linear')
 #reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
-reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
+#reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
 
 
 
