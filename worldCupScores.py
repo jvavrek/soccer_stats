@@ -116,10 +116,12 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
   return reg
 
 
-# Compute the lambdas from reg coeffs betas and features ws of a single observation
-def compute_lambdas(betas, ws):
-  ll0, ll1, ll2 = np.dot(betas[0], ws[0]), np.dot(betas[1], ws[1]), np.dot(betas[2], ws[2])
-  return map(np.exp, [ll0, ll1, ll2])
+# Compute the log_lambdas from reg coeffs betas and features wi of a single observation i.
+# Returns a vector of three log_lambdas.
+def compute_log_lambdas(betas, wi):
+  wi = wi.values
+  ll0, ll1, ll2 = np.dot(betas[0], wi), np.dot(betas[1], wi), np.dot(betas[2], wi)
+  return np.array([ll0, ll1, ll2])
 
 
 # Implementation of the EM algorithm as specified in the original BVP pdf.
@@ -127,41 +129,49 @@ def compute_lambdas(betas, ws):
 # lambda as a function of the beta. Probably best to choose this model based on
 # the results of the linear/ridge/lasso regression as we discussed earlier.
 def BVP_EM_algorithm(features, scores):
-  n_obs = len(scores)
-  # initial guesses for lambda parameters
-  lambda0 = 0.1 * np.ones(n_obs)
-  lambda1 = 1.0 * np.ones(n_obs)
-  lambda2 = 0.9 * np.ones(n_obs)
+  n_obs, n_coef = features.shape
+  # initial guesses for lambda, beta parameters
+  #lambda0 = 0.1 * np.ones(n_obs)
+  #lambda1 = 1.0 * np.ones(n_obs)
+  #lambda2 = 0.9 * np.ones(n_obs)
   svec = np.zeros(n_obs)
-  initBetas = np.ones(features.shape)
+  betaMatrix = np.ones([3, n_coef])*1e-6 # initial guess; 3xn makes indexing easier
 
   # Define the likelihood function: the probability of observing the data given the model.
   # We would like to MAXIMIZE the likelihood in the M-step of BVP_EM_algorithm(), so we
   # will MINIMIZE the negative log-likelihood. This is defined internally within BVP_EM_algorithm
   # so that it can access scores/features without needing to define any globals.
+  # See https://stackoverflow.com/questions/7718034/maximum-likelihood-estimate-pseudocode
   def neg_log_likelihood(betas):
     nll = 0.0
     for i in xrange(n_obs):
       [xi,yi] = scores.iloc[i].values
-      lambdas = compute_lambdas(betas, features)
+      log_lambdas = compute_log_lambdas(betas, features.iloc[i])
+      lambdas = map(np.exp, log_lambdas)
       nll += -np.log(prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi, yi))
     return nll
 
   #k = 0
   #converged = False
   #while not converged:
+  # E-step
   for i in xrange(n_obs):
-    # E-step
     si = 0
     [xi,yi] = scores.iloc[i].values
     if min(xi,yi) > 0:
-      num   = prob_bivariate_poisson(lambda0[i], lambda1[i], lambda2[i], xi-1, yi-1)
-      denom = prob_bivariate_poisson(lambda0[i], lambda1[i], lambda2[i], xi,   yi)
-      si = lambda0[i] * num / denom
-    print si
+      log_lambdas = compute_log_lambdas(betaMatrix, features.iloc[i])
+      print log_lambdas
+      lambdas = map(np.exp, log_lambdas)
+      print lambdas
+      num   = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi-1, yi-1)
+      denom = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi,   yi)
+      si = lambdas[0] * num / denom
+    svec[i] = si
 
-    # M-step
-    results = minimize(neg_log_likelihood, initBetas, method='nelder-mead')
+  # FIXME left off here. Need to actually update the betas
+  # M-step
+  #results = minimize(neg_log_likelihood, betaMatrix, method='nelder-mead')
+  #print results
   #k += 1
 
 
