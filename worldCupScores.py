@@ -7,6 +7,7 @@
 # MC sample initial distribution
 # Better error handling?
 # Time profile?
+# StandardScaler?
 
 import sys
 import numpy as np
@@ -16,7 +17,7 @@ import scipy.special
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import linear_model
-from scipy.optimize import least_squares
+from scipy.optimize import minimize
 from project_functions import Create_Feature_Matrix
 
 np.set_printoptions(precision=3, linewidth=180)
@@ -121,29 +122,29 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
 # lambda as a function of the beta. Probably best to choose this model based on
 # the results of the linear/ridge/lasso regression as we discussed earlier.
 def BVP_EM_algorithm(features, scores):
+  n_obs = len(scores)
   # initial guesses for lambda parameters
-  lambda0 = 0.1
-  lambda1 = 1.0
-  lambda2 = 0.9
+  lambda0 = 0.1 * np.ones(n_obs)
+  lambda1 = 1.0 * np.ones(n_obs)
+  lambda2 = 0.9 * np.ones(n_obs)
+  svec = np.zeros(n_obs)
 
   #k = 0
   #converged = False
   #while not converged:
-  for i in xrange(len(scores)):
+  for i in xrange(n_obs):
     # E-step
     si = 0
-    [xi, yi] = scores.iloc(i).values
+    [xi,yi] = scores.iloc[i].values
     if min(xi,yi) > 0:
-      si = lambda0 * prob_bivariate_poisson(lambda0, lambda1, lambda2, xi-1, yi-1) / prob_bivariate_poisson(lambda0, lambda1, lambda2, xi, yi)
+      num   = prob_bivariate_poisson(lambda0[i], lambda1[i], lambda2[i], xi-1, yi-1)
+      denom = prob_bivariate_poisson(lambda0[i], lambda1[i], lambda2[i], xi,   yi)
+      si = lambda0[i] * num / denom
+    print si
 
-    # M-step
+    # M-step requires a maximum likelihood computation I'm unsure about
+    results = minimize(regressLL, initParams, method='nelder-mead')
   #k += 1
-
-
-# Better idea (?): just do a non-linear least-squares fit
-# See the bottom of https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
-# FIXME left off here. Can't think anymore at 2am
-res_wrapped = least_squares(f_wrap, (0.1, 0.1), bounds=([0, 0], [1, 1]))
 
 
 # Build and slice the datasets for the score_regression()
@@ -210,6 +211,7 @@ fm, sm = build_dataframes(diff=False)
 reg = score_regression(fm, sm, opt='linear')
 #reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
 #reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
+BVP_EM_algorithm(fm,sm)
 
 
 
