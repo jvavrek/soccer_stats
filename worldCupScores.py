@@ -16,6 +16,7 @@ import scipy.special
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import linear_model
+from scipy.optimize import least_squares
 from project_functions import Create_Feature_Matrix
 
 np.set_printoptions(precision=3, linewidth=180)
@@ -119,18 +120,30 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
 # Will need to think about this a bit more, since it requires a model for the
 # lambda as a function of the beta. Probably best to choose this model based on
 # the results of the linear/ridge/lasso regression as we discussed earlier.
-def BVP_EM_algorithm(featureMatrix, scoreMatrix):
+def BVP_EM_algorithm(features, scores):
   # initial guesses for lambda parameters
   lambda0 = 0.1
   lambda1 = 1.0
   lambda2 = 0.9
 
-  k = 0
-  converged = False
+  #k = 0
+  #converged = False
   #while not converged:
-  #  for i in xrange(len(scoreMatrix)):
-  #    si = prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y)
-  #  k += 1
+  for i in xrange(len(scores)):
+    # E-step
+    si = 0
+    [xi, yi] = scores.iloc(i).values
+    if min(xi,yi) > 0:
+      si = lambda0 * prob_bivariate_poisson(lambda0, lambda1, lambda2, xi-1, yi-1) / prob_bivariate_poisson(lambda0, lambda1, lambda2, xi, yi)
+
+    # M-step
+  #k += 1
+
+
+# Better idea (?): just do a non-linear least-squares fit
+# See the bottom of https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
+# FIXME left off here. Can't think anymore at 2am
+res_wrapped = least_squares(f_wrap, (0.1, 0.1), bounds=([0, 0], [1, 1]))
 
 
 # Build and slice the datasets for the score_regression()
