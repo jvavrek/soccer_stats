@@ -116,13 +116,6 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
   return reg
 
 
-# Define the likelihood function: the probability of observing the data given the model.
-# This is what we would like to MAXIMIZE in the M-step of BVP_EM_algorithm().
-def likelihood():
-  pass
-
-
-
 # Implementation of the EM algorithm as specified in the original BVP pdf.
 # Will need to think about this a bit more, since it requires a model for the
 # lambda as a function of the beta. Probably best to choose this model based on
@@ -134,6 +127,13 @@ def BVP_EM_algorithm(features, scores):
   lambda1 = 1.0 * np.ones(n_obs)
   lambda2 = 0.9 * np.ones(n_obs)
   svec = np.zeros(n_obs)
+
+  # Define the likelihood function: the probability of observing the data given the model.
+  # We would like to MAXIMIZE the likelihood in the M-step of BVP_EM_algorithm(), so we
+  # will MINIMIZE the negative log-likelihood. This is defined internally within
+  # BVP_EM_algorithm so that it can access scores without needing to define any globals.
+  def neg_log_likelihood(params):
+    pass
 
   #k = 0
   #converged = False
