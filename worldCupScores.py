@@ -49,6 +49,7 @@ def scores_indep_poisson(lambda1, lambda2):
 
 # In the bivariate Poisson model, we need to build the joint pdf ourselves
 def prob_bivariate_poisson(lambda0, lambda1, lambda2, x, y):
+  x,y = int(np.round(x)), int(np.round(y)) # recast just to be sure
   prefactor1 = np.exp(-(lambda0+lambda1+lambda2))
   prefactor2 = np.power(lambda1,x) * np.power(lambda2,y) / (1.0 * np.math.factorial(x) * np.math.factorial(y))
   sumfactor = 0.0
@@ -130,11 +131,8 @@ def compute_log_lambdas(betas, wi):
 # the results of the linear/ridge/lasso regression as we discussed earlier.
 def BVP_EM_algorithm(features, scores):
   n_obs, n_coef = features.shape
+  svec, xvec, yvec = np.zeros(n_obs), np.zeros(n_obs), np.zeros(n_obs)
   # initial guesses for lambda, beta parameters
-  #lambda0 = 0.1 * np.ones(n_obs)
-  #lambda1 = 1.0 * np.ones(n_obs)
-  #lambda2 = 0.9 * np.ones(n_obs)
-  svec = np.zeros(n_obs)
   betaMatrix = np.ones([3, n_coef])*1e-6 # initial guess; 3xn makes indexing easier
 
   # Define the likelihood function: the probability of observing the data given the model.
@@ -142,14 +140,14 @@ def BVP_EM_algorithm(features, scores):
   # will MINIMIZE the negative log-likelihood. This is defined internally within BVP_EM_algorithm
   # so that it can access scores/features without needing to define any globals.
   # See https://stackoverflow.com/questions/7718034/maximum-likelihood-estimate-pseudocode
-  def neg_log_likelihood(betas):
-    nll = 0.0
+  def neg_log_likelihood(betas, modified_scores):
+    betas = betas.reshape([3, n_coef]) # weird that this is necessary but OK
+    nloglike = 0.0
     for i in xrange(n_obs):
-      [xi,yi] = scores.iloc[i].values
+      [xi,yi] = modified_scores.iloc[i].values
       log_lambdas = compute_log_lambdas(betas, features.iloc[i])
-      lambdas = map(np.exp, log_lambdas)
-      nll += -np.log(prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi, yi))
-    return nll
+      nloglike += -np.log(prob_bivariate_poisson(np.exp(log_lambdas[0]), np.exp(log_lambdas[1]), np.exp(log_lambdas[2]), xi, yi))
+    return nloglike
 
   #k = 0
   #converged = False
@@ -160,17 +158,21 @@ def BVP_EM_algorithm(features, scores):
     [xi,yi] = scores.iloc[i].values
     if min(xi,yi) > 0:
       log_lambdas = compute_log_lambdas(betaMatrix, features.iloc[i])
-      print log_lambdas
       lambdas = map(np.exp, log_lambdas)
-      print lambdas
+      print 'lambdas =', lambdas
       num   = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi-1, yi-1)
       denom = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi,   yi)
       si = lambdas[0] * num / denom
-    svec[i] = si
+    svec[i] = int(np.round(si)) # FIXME unsure about this
 
   # FIXME left off here. Need to actually update the betas
   # M-step
-  #results = minimize(neg_log_likelihood, betaMatrix, method='nelder-mead')
+  scores['x-s'] = scores['Score1'] - svec
+  scores['y-s'] = scores['Score2'] - svec
+  scoresMod = scores[['x-s','y-s']]
+  print 'beginning minimization'
+  results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-1) # 5 minutes for tol=1e-2, 3 s for 1e-1, wow
+  print 'finished minimization in M-step'
   #print results
   #k += 1
 
