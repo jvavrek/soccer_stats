@@ -117,14 +117,6 @@ def score_regression(features, scores, opt='linear', alpha=0.5):
   return reg
 
 
-# Compute the log_lambdas from reg coeffs betas and features wi of a single observation i.
-# Returns a vector of three log_lambdas.
-def compute_log_lambdas(betas, wi):
-  wi = wi.values
-  ll0, ll1, ll2 = np.dot(betas[0], wi), np.dot(betas[1], wi), np.dot(betas[2], wi)
-  return np.array([ll0, ll1, ll2])
-
-
 # Implementation of the EM algorithm as specified in the original BVP pdf.
 # Will need to think about this a bit more, since it requires a model for the
 # lambda as a function of the beta. Probably best to choose this model based on
@@ -152,11 +144,19 @@ def BVP_EM_algorithm(features, scores):
       nloglike += -np.log(prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi, yi))
     return nloglike
 
+  # Convergence test: normalized sum of squared residuals
   def betaConvergence(betaMatrixOld, betaMatrix):
     res = betaMatrix - betaMatrixOld
     ssq = np.sum(res**2)
     nsq = ssq/(1.0*res.size)
     return nsq
+
+  # Compute the log_lambdas from reg coeffs betas and features wi of a single observation i.
+  # Returns a vector of three log_lambdas.
+  def compute_log_lambdas(betas, wi):
+    wi = wi.values
+    ll0, ll1, ll2 = np.dot(betas[0], wi), np.dot(betas[1], wi), np.dot(betas[2], wi)
+    return np.array([ll0, ll1, ll2])
 
   # main EM loop
   k = 0
@@ -199,7 +199,13 @@ def BVP_EM_algorithm(features, scores):
       print '  converged'
       break
 
-    k += 1
+    k += 1 # end main EM loop
+
+  print 'final lambda list:'
+  for i in xrange(n_obs):
+    ll = compute_log_lambdas(betaMatrix, features.iloc[i])
+    lambdas_final = map(np.exp, ll)
+    print lambdas_final
 
   return results
 
@@ -268,7 +274,7 @@ fm, sm = build_dataframes(diff=False)
 reg = score_regression(fm, sm, opt='linear')
 #reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
 #reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
-BVP_EM_algorithm(fm,sm)
+results = BVP_EM_algorithm(fm,sm)
 
 
 
