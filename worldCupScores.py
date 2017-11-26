@@ -134,6 +134,8 @@ def BVP_EM_algorithm(features, scores):
   svec, xvec, yvec = np.zeros(n_obs), np.zeros(n_obs), np.zeros(n_obs)
   # initial guesses for lambda, beta parameters
   betaMatrix = np.ones([3, n_coef])*1e-6 # initial guess; 3xn makes indexing easier
+  betaMatrixOld = betaMatrix*1e6 # just to make sure it doesn't converge first loop
+  results = None
 
   # Define the likelihood function: the probability of observing the data given the model.
   # We would like to MAXIMIZE the likelihood in the M-step of BVP_EM_algorithm(), so we
@@ -146,35 +148,60 @@ def BVP_EM_algorithm(features, scores):
     for i in xrange(n_obs):
       [xi,yi] = modified_scores.iloc[i].values
       log_lambdas = compute_log_lambdas(betas, features.iloc[i])
-      nloglike += -np.log(prob_bivariate_poisson(np.exp(log_lambdas[0]), np.exp(log_lambdas[1]), np.exp(log_lambdas[2]), xi, yi))
+      lambdas = map(np.exp, log_lambdas)
+      nloglike += -np.log(prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi, yi))
     return nloglike
 
-  #k = 0
-  #converged = False
-  #while not converged:
-  # E-step
-  for i in xrange(n_obs):
-    si = 0
-    [xi,yi] = scores.iloc[i].values
-    if min(xi,yi) > 0:
-      log_lambdas = compute_log_lambdas(betaMatrix, features.iloc[i])
-      lambdas = map(np.exp, log_lambdas)
-      print 'lambdas =', lambdas
-      num   = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi-1, yi-1)
-      denom = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi,   yi)
-      si = lambdas[0] * num / denom
-    svec[i] = int(np.round(si)) # FIXME unsure about this
+  def betaConvergence(betaMatrixOld, betaMatrix):
+    res = betaMatrix - betaMatrixOld
+    ssq = np.sum(res**2)
+    nsq = ssq/(1.0*res.size)
+    return nsq
 
-  # FIXME left off here. Need to actually update the betas
-  # M-step
-  scores['x-s'] = scores['Score1'] - svec
-  scores['y-s'] = scores['Score2'] - svec
-  scoresMod = scores[['x-s','y-s']]
-  print 'beginning minimization'
-  results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-1) # 5 minutes for tol=1e-2, 3 s for 1e-1, wow
-  print 'finished minimization in M-step'
-  #print results
-  #k += 1
+  # main EM loop
+  k = 0
+  converged = False
+  while not converged:
+    print '\nEM iteration %d'%k
+    if k == 5:
+      print '  aborting on k = %d'%k
+      break
+
+    # E-step
+    for i in xrange(n_obs):
+      si = 0
+      [xi,yi] = scores[['Score1','Score2']].iloc[i].values # be explicit about Score1,2 since we modify DataFrame below
+      if min(xi,yi) > 0:
+        log_lambdas = compute_log_lambdas(betaMatrix, features.iloc[i])
+        lambdas = map(np.exp, log_lambdas)
+        num   = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi-1, yi-1)
+        denom = prob_bivariate_poisson(lambdas[0], lambdas[1], lambdas[2], xi,   yi)
+        si = lambdas[0] * num / denom
+      svec[i] = int(np.round(si)) # FIXME unsure about this
+
+    # M-step
+    scores['x-s'] = scores['Score1'] - svec
+    scores['y-s'] = scores['Score2'] - svec
+    scoresMod = scores[['x-s','y-s']]
+    print '  beginning minimization'
+    results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-2)
+    # 4.5 minutes for tol=1e-2, 3 s for 1e-1, wow. It seems like the initial guess is within a tol of > 1e-2
+    # and it exits immediately, whereas the 1e-2 tol actually produces different results
+    print '  finished minimization in M-step'
+    betaMatrixOld = betaMatrix
+    betaMatrix = results.x.reshape([3,n_coef])
+
+    # Test for convergence
+    nsq = betaConvergence(betaMatrixOld, betaMatrix)
+    print '  normalized sum of squares of residuals:', nsq
+    if nsq < 1e-8:
+      converged = True
+      print '  converged'
+      break
+
+    k += 1
+
+  return results
 
 
 # Build and slice the datasets for the score_regression()
