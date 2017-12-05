@@ -184,28 +184,29 @@ def BVP_EM_algorithm(features, scores):
     scores['y-s'] = scores['Score2'] - svec
     scoresMod = scores[['x-s','y-s']]
     print '  beginning minimization'
-    results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-2)
+    results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-3)
     # 4.5 minutes for tol=1e-2, 3 s for 1e-1, wow. It seems like the initial guess is within a tol of > 1e-2
     # and it exits immediately, whereas the 1e-2 tol actually produces different results
     print '  finished minimization in M-step'
     betaMatrixOld = betaMatrix
     betaMatrix = results.x.reshape([3,n_coef])
 
+    print 'current lambda list:'
+    for i in xrange(n_obs):
+      ll = compute_log_lambdas(betaMatrix, features.iloc[i])
+      lambdas_final = map(np.exp, ll)
+      [xi,yi] = scores[['Score1','Score2']].iloc[i].values
+      print lambdas_final, xi, yi
+
     # Test for convergence
     nsq = betaConvergence(betaMatrixOld, betaMatrix)
     print '  normalized sum of squares of residuals:', nsq
-    if nsq < 1e-8:
+    if nsq < 1e-7:
       converged = True
       print '  converged'
       break
 
     k += 1 # end main EM loop
-
-  print 'final lambda list:'
-  for i in xrange(n_obs):
-    ll = compute_log_lambdas(betaMatrix, features.iloc[i])
-    lambdas_final = map(np.exp, ll)
-    print lambdas_final
 
   return results
 
@@ -230,8 +231,7 @@ standard_features = ['Matches Played',
 def build_dataframes(diff=False):
   m = Create_Feature_Matrix(dropboxDir, 
                             match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
-                            years = [2014,2010,2006,2002],
-                            features_to_consider = standard_features)
+                            years = [2014,2010,2006,2002])
   m.dropna(inplace=True)
   features = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
 

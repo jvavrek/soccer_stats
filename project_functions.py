@@ -66,7 +66,7 @@ def Create_Feature_Matrix(directory,
         #Combine to Feature Matrix
         feature_matrix = pd.concat([feature_matrix,features_of_this_year], axis=0, ignore_index=True)
 
-        print(len(features_of_this_year))
+        #print(len(features_of_this_year))
         
     return feature_matrix
 
