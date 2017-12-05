@@ -30,7 +30,7 @@ def Create_Feature_Matrix(directory,
         last_year = years[y+1]
 
         #Grab Last World Cup's Performance Metrics of Country 1 ------
-        perf_data = pd.DataFrame.from_csv("./%s.csv"%last_year)
+        perf_data = pd.DataFrame.from_csv(directory+"%s.csv"%last_year)
         perf_data = perf_data[historic_features]
         perf_data.columns = [x+"_C1" for x in perf_data.columns]
         perf_data = perf_data.reset_index()
@@ -39,7 +39,7 @@ def Create_Feature_Matrix(directory,
         features_of_this_year = features_of_this_year.merge(perf_data, how='left', on="Country1")
 
         #Grab Current Ranking Features of Country 1 ------
-        perf_data = pd.DataFrame.from_csv("./%s.csv"%current_year)
+        perf_data = pd.DataFrame.from_csv(directory+"%s.csv"%current_year)
         perf_data = perf_data[current_features]
         perf_data.columns = [x+"_C1" for x in perf_data.columns]
         perf_data = perf_data.reset_index()
@@ -48,7 +48,7 @@ def Create_Feature_Matrix(directory,
 
         #Grab Last World Cup's Performance Metrics of Country 2
 
-        perf_data = pd.DataFrame.from_csv("./%s.csv"%last_year)
+        perf_data = pd.DataFrame.from_csv(directory+"%s.csv"%last_year)
         perf_data = perf_data[historic_features]
         perf_data.columns = [x+"_C2" for x in perf_data.columns]
         perf_data = perf_data.reset_index()
@@ -56,7 +56,7 @@ def Create_Feature_Matrix(directory,
         features_of_this_year = features_of_this_year.merge(perf_data, how='left', on="Country2")
 
         #Grab Current Ranking Features of Country 2 ------
-        perf_data = pd.DataFrame.from_csv("./%s.csv"%current_year)
+        perf_data = pd.DataFrame.from_csv(directory+"%s.csv"%current_year)
         perf_data = perf_data[current_features]
         perf_data.columns = [x+"_C2" for x in perf_data.columns]
         perf_data = perf_data.reset_index()
