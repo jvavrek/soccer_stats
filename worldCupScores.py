@@ -89,13 +89,11 @@ def scores_bivariate_poisson(prob_table, break_ties=False):
   sample = np.random.choice(range(n2), p=tab1d)
   s1 = sample//n
   s2 = sample%n
-  if break_ties == True:
+  if s1 == s2 and break_ties == True:
     if prob_table[s1+1,s2] > prob_table[s1,s2+1]:
       s1 += 1
-      print 'adding 1 to s1'
     else:
       s2 += 1
-      print 'adding 1 to s2'
   return s1, s2
 
 
@@ -291,6 +289,7 @@ def build_dataframes(base_features=['Goal_Per_Game_Avg']):
 def create_tournament_seeds(randomized=False):
   m = pd.read_csv(dropboxDir+'2018'+'.csv')
   m.dropna(inplace=True)
+  m.drop(['Seed - AW'], axis=1, inplace=True)
   return m
 
 
@@ -373,10 +372,12 @@ def simulate_tournament(betaMatrix):
   
       wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
-      if s1 >= s2:
-        m['R16 W'].loc[m['Country']==t1['Country']] += 1 # FIXME need to handle ties!!
+      if s1 > s2:
+        m['R16 W'].loc[m['Country']==t1['Country']] += 1
       elif s1 < s2:
         m['R16 W'].loc[m['Country']==t2['Country']] += 1
+      else:
+        print 'TIE!'
       if i==1:
         m['R16 brac'].loc[m['Country']==t1['Country']] += 1
         m['R16 brac'].loc[m['Country']==t2['Country']] += 1
@@ -401,10 +402,12 @@ def simulate_tournament(betaMatrix):
       t2 = subgroup.iloc[1]
       wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
-      if s1 >= s2:
-        m['Qtr W'].loc[m['Country']==t1['Country']] += 1 # FIXME need to handle ties!!
+      if s1 > s2:
+        m['Qtr W'].loc[m['Country']==t1['Country']] += 1
       elif s1 < s2:
         m['Qtr W'].loc[m['Country']==t2['Country']] += 1
+      else:
+        print 'TIE!'
       if i==1:
         m['Qtr brac'].loc[m['Country']==t1['Country']] += 1 # FIXME unsure if this is right
         m['Qtr brac'].loc[m['Country']==t2['Country']] += 1
@@ -419,10 +422,12 @@ def simulate_tournament(betaMatrix):
     t2 = subgroup.iloc[1]
     wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
     s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
-    if s1 >= s2:
-      m['Semi W'].loc[m['Country']==t1['Country']] += 1 # FIXME need to handle ties!!
+    if s1 > s2:
+      m['Semi W'].loc[m['Country']==t1['Country']] += 1
     elif s1 < s2:
       m['Semi W'].loc[m['Country']==t2['Country']] += 1
+    else:
+      print 'TIE!'
 
   print m_semi
 
@@ -434,10 +439,12 @@ def simulate_tournament(betaMatrix):
   t2 = m_finals.iloc[1]
   wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
   s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
-  if s1 >= s2:
-    m['Final W'].loc[m['Country']==t1['Country']] += 1 # FIXME need to handle ties!!
+  if s1 > s2:
+    m['Final W'].loc[m['Country']==t1['Country']] += 1
   elif s1 < s2:
     m['Final W'].loc[m['Country']==t2['Country']] += 1
+  else:
+    print 'TIE!' 
 
   print m_finals
   print m
