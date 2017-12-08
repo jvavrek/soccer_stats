@@ -5,9 +5,8 @@
 # Use the BVP to predict the winner of a game
 # Build a tournament structure table and propagate
 # MC sample initial distribution
-# Better error handling?
-# Time profile?
-# StandardScaler?
+# Validation: test and training set scores
+# Variations in AIC due to starting point
 
 import sys
 import numpy as np
@@ -20,7 +19,9 @@ from sklearn import linear_model
 from scipy.optimize import minimize
 from project_functions import Create_Feature_Matrix
 
-np.set_printoptions(precision=3, linewidth=180)
+np.set_printoptions(precision=3, linewidth=200)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
 
 # Hardcoded (!) path to project data
 dropboxDir = '~/Dropbox (MIT)/Class Project/Project Data/'
@@ -90,7 +91,6 @@ def scores_bivariate_poisson(prob_table):
   sample = np.random.choice(range(n2), p=tab1d)
   s1 = sample//n
   s2 = sample%n
-  print sample, s1, s2
   return s1, s2
 
 
@@ -125,7 +125,8 @@ def BVP_EM_algorithm(features, scores):
   n_obs, n_coef = features.shape
   svec, xvec, yvec = np.zeros(n_obs), np.zeros(n_obs), np.zeros(n_obs)
   # initial guesses for lambda, beta parameters
-  betaMatrix = np.ones([3, n_coef])*1e-6 # initial guess; 3xn makes indexing easier
+  #betaMatrix = np.ones([3, n_coef])*1e-6 # initial guess; 3xn makes indexing easier
+  betaMatrix = np.random.rand(3,n_coef)*1e-6
   betaMatrixOld = betaMatrix*1e6 # just to make sure it doesn't converge first loop
   results = None
 
@@ -151,19 +152,19 @@ def BVP_EM_algorithm(features, scores):
     nsq = ssq/(1.0*res.size)
     return nsq
 
-  # Compute the log_lambdas from reg coeffs betas and features wi of a single observation i.
-  # Returns a vector of three log_lambdas.
-  def compute_log_lambdas(betas, wi):
-    wi = wi.values
-    ll0, ll1, ll2 = np.dot(betas[0], wi), np.dot(betas[1], wi), np.dot(betas[2], wi)
-    return np.array([ll0, ll1, ll2])
+  def compute_AIC(results):
+    nll_min = results.fun
+    k = results.x.size
+    print 'nll_min =', nll_min
+    print 'k =', k
+    return 2.0*(k + nll_min)
 
   # main EM loop
   k = 0
   converged = False
   while not converged:
     print '\nEM iteration %d'%k
-    if k == 5:
+    if k == 10:
       print '  aborting on k = %d'%k
       break
 
@@ -184,12 +185,11 @@ def BVP_EM_algorithm(features, scores):
     scores['y-s'] = scores['Score2'] - svec
     scoresMod = scores[['x-s','y-s']]
     print '  beginning minimization'
-    results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='nelder-mead', tol=1e-3)
-    # 4.5 minutes for tol=1e-2, 3 s for 1e-1, wow. It seems like the initial guess is within a tol of > 1e-2
-    # and it exits immediately, whereas the 1e-2 tol actually produces different results
+    results = minimize(neg_log_likelihood, betaMatrix, args=scoresMod, method='BFGS', tol=1e-9)
     print '  finished minimization in M-step'
+    print '  status:', results.message
     betaMatrixOld = betaMatrix
-    betaMatrix = results.x.reshape([3,n_coef])
+    betaMatrix = results.x.reshape([3,n_coef]) # <------ here is where we get the betaMatrix from results
 
     print 'current lambda list:'
     for i in xrange(n_obs):
@@ -198,21 +198,228 @@ def BVP_EM_algorithm(features, scores):
       [xi,yi] = scores[['Score1','Score2']].iloc[i].values
       print lambdas_final, xi, yi
 
+    print 'current beta matrix:'
+    print betaMatrix
+
+    aic = compute_AIC(results)
+    print 'current AIC:', aic
+
     # Test for convergence
     nsq = betaConvergence(betaMatrixOld, betaMatrix)
     print '  normalized sum of squares of residuals:', nsq
-    if nsq < 1e-7:
+    if nsq < 1e-10:
       converged = True
       print '  converged'
       break
 
     k += 1 # end main EM loop
 
-  return results
+  #return results
+  return betaMatrix, aic
 
 
-# Build and slice the datasets for the score_regression()
-# and BVP_EM_algorithm() functions.
+# Compute the log_lambdas from reg coeffs betas and features wi of a single observation i.
+# Returns a vector of three log_lambdas.
+def compute_log_lambdas(betas, wi):
+  if type(wi) is not np.ndarray:
+    wi = wi.values
+  ll0, ll1, ll2 = np.dot(betas[0], wi), np.dot(betas[1], wi), np.dot(betas[2], wi)
+  return np.array([ll0, ll1, ll2])
+
+
+def validation_scores(betaMatrix, features, scores):
+  print 'Running validation...'
+  n_obs, n_coef = features.shape
+
+  correct_scores  = 0
+  correct_winners = 0
+  #fbinary = 0
+  r2 = 0
+
+  for i in xrange(n_obs):
+    ll = compute_log_lambdas(betaMatrix, features.iloc[i])
+    lambdas_final = map(np.exp, ll)
+    x_pred, y_pred = lambdas_final[0] + lambdas_final[1], lambdas_final[0] + lambdas_final[2]
+    [xi,yi] = scores[['Score1','Score2']].iloc[i].values
+
+    if int(np.round(x_pred)) == xi and int(np.round(y_pred)) == yi:
+      correct_scores += 1
+    if ((x_pred > y_pred) and (xi > yi)) or ((x_pred < y_pred) and (xi < yi)):
+      correct_winners += 1
+    r2 += ((xi-x_pred)**2 + (yi-y_pred)**2)
+
+    #[sx,sy] = features[['seed_C1','seed_C2']].iloc[i].values
+    #if ((sx < sy) and (xi > yi)) or ((sy < sx) and (yi > xi)):
+    #  fbinary +=1
+
+  correct_scores  /= (1.0*n_obs)
+  correct_winners /= (1.0*n_obs)
+  #fbinary /= (1.0*n_obs)
+
+  return correct_scores, correct_winners, r2
+
+
+# Takes base_features and adds _C1 and _C2 to the strings. Returns the new list features_out.
+# Anjian suggests most important features seem to be y/r per game, GA per game, FIFA rank, host, seed, cohesion, dist
+def create_feature_list(base_features):
+  f1 = base_features[:]
+  f2 = base_features[:]
+  f1[:] = [i + '_C1' for i in f1]
+  f2[:] = [i + '_C2' for i in f2]
+  return f1 + f2
+
+
+# Build and slice the datasets for the score_regression() and BVP_EM_algorithm() functions.
+def build_dataframes(base_features=['Goal_Per_Game_Avg']):
+  m = Create_Feature_Matrix(dropboxDir, 
+                            match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
+                            years = [2014,2010,2006,2002])
+  m.dropna(inplace=True)
+  #features = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
+  #features = m[['Matches Played_C1', 'Goal_Per_Game_Avg_C1', 'FIFA rank_C1', 'Matches Played_C2', 'Goal_Per_Game_Avg_C2', 'FIFA rank_C2']]
+  features_list = create_feature_list(base_features)
+  features = m[features_list]
+  #features.loc[:,'dist_C1'] *= 1e-6
+  #features.loc[:,'dist_C2'] *= 1e-6
+
+  scores = m[['Score1','Score2']]
+
+  return features, scores
+
+
+# Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
+# to obtain the seeds, then creates brackets based on those seeds. Top 4 (?) teams
+# are 'protected' and don't play each other, rest are placed randomly.
+# NOTE: real draw for 2018 takes place Dec 1! Though, they might not do it randomly:
+# https://www.si.com/soccer/2017/11/14/world-cup-group-draw-pots-russia-2018
+# Could use random vs deterministic to infer how much of an advantage it is to be
+# one of the 'protected' seeds, especially the host nation.
+def create_tournament_seeds():
+  m = pd.read_csv(dropboxDir+'2018'+'.csv')
+  m.dropna(inplace=True)
+
+
+# Perform the full tournament simulation. Need to look into details, but this should
+# involve group play followed by elimination rounds. For each matchup, use the model
+# to predict the score, and advance the winning teams until we have a winner.
+def simulate_tournament(betaMatrix):
+  m = pd.read_csv(dropboxDir+'2018'+'.csv')
+  m.dropna(inplace=True)
+
+  m['Group GF'] = 0
+  m['Group GA'] = 0
+  m['Group W'] = 0
+  m['Group L'] = 0
+  m['Group T'] = 0
+  m['R16 W'] = 0
+  m['R16 idx'] = 0
+  m['Qtr W'] = 0
+  m['Qtr idx'] = 0
+  m['Semi W'] = 0
+  m['Final W'] = 0
+
+  # Group play: everyone plays everyone in their pool
+  groups = pd.unique(m['Group'])
+  for g in groups:
+    group_data = m[m['Group'] == g]
+    teams = pd.unique(group_data['Country'])
+    for i in xrange(len(teams)):
+      for j in xrange(i+1,len(teams)):
+        df = pd.DataFrame()
+        wi = np.array([group_data['Seed'].iloc[i], group_data['Seed'].iloc[j]]) # FIXME temporary hack
+        lambdas = map(np.exp, compute_log_lambdas(betaMatrix,wi))
+        pt = build_bivariate_poisson_table(lambdas[0], lambdas[1], lambdas[2], nmax=10)
+        s1, s2 = scores_bivariate_poisson(pt)
+        print '%s %i | %s %i'%(teams[i], s1, teams[j], s2)
+        m['Group GF'].loc[m['Country']==teams[i]] += s1  # FIXME there has got to be a better/faster way to do this...
+        m['Group GA'].loc[m['Country']==teams[i]] += s2
+        m['Group GF'].loc[m['Country']==teams[j]] += s2
+        m['Group GA'].loc[m['Country']==teams[j]] += s1
+        if s1 > s2:
+          m['Group W'].loc[m['Country']==teams[i]] += 1
+          m['Group L'].loc[m['Country']==teams[j]] += 1
+        elif s2 > s1:
+          m['Group L'].loc[m['Country']==teams[i]] += 1
+          m['Group W'].loc[m['Country']==teams[j]] += 1
+        else:
+          m['Group T'].loc[m['Country']==teams[i]] += 1
+          m['Group T'].loc[m['Country']==teams[j]] += 1
+
+  m.sort_values(['Group', 'Group W', 'Group GF'], ascending=[True,False,False], inplace=True)
+  m.reset_index(inplace=True)
+  print m
+
+  m_sixteen = m[m.index%4<=1]
+  print m_sixteen
+
+  # Elimination rounds
+  # Only top two teams from each pool advance to round of 16, then single knockout.
+  # R16: A1 plays B2, A2 plays B1, etc
+  groups = pd.unique(m_sixteen['Group'])
+  for g in xrange(0, len(groups)-1, 2):
+    this_group = m_sixteen[m_sixteen['Group'] == groups[g]]
+    chal_group = m_sixteen[m_sixteen['Group'] == groups[g+1]]
+
+    for i in xrange(2):
+      if i==0:
+        hi = this_group.iloc[0]
+        lo = chal_group.iloc[1]
+      else:
+        hi = chal_group.iloc[0]
+        lo = this_group.iloc[1]
+  
+      wi = np.array([hi['Seed'], lo['Seed']]) # FIXME temporary hack
+      lambdas = map(np.exp, compute_log_lambdas(betaMatrix,wi))
+      pt = build_bivariate_poisson_table(lambdas[0], lambdas[1], lambdas[2], nmax=10)
+      s1, s2 = scores_bivariate_poisson(pt)
+      print '%s %i | %s %i'%(hi['Country'], s1, lo['Country'], s2)
+      if s1 >= s2:
+        m['R16 W'].loc[m['Country']==hi['Country']] += 1 # FIXME need to handle ties!!
+      elif s1 < s2:
+        m['R16 W'].loc[m['Country']==lo['Country']] += 1
+      if i==1:
+        m['R16 idx'].loc[m['Country']==hi['Country']] += 1
+        m['R16 idx'].loc[m['Country']==lo['Country']] += 1
+
+  m_quarter = m[m['R16 W'] > 0]
+
+
+  print m_quarter
+  # Quarter finals, eight teams remaining.
+  # Winner of A/B plays counterpart from C/D; winner of B/A plays that from D/C
+  # Elimination rounds
+  # Only top two teams from each pool advance to round of 16, then single knockout.
+  # R16: A1 plays B2, A2 plays B1, etc
+  groups = pd.unique(m_quarter['Group'])
+  for g in xrange(0, len(groups)-1, 2):
+    abcd_group = m_quarter[m_quarter['Group'].isin(['A','B','C','D'])]
+    efgh_group = m_quarter[m_quarter['Group'].isin(['D','E','F','G'])]
+
+    for i in xrange(2):
+      if i==0:
+        hi = this_group.iloc[0]
+        lo = chal_group.iloc[1]
+      else:
+        hi = chal_group.iloc[0]
+        lo = this_group.iloc[1]
+  
+      wi = np.array([hi['Seed'], lo['Seed']]) # FIXME temporary hack
+      lambdas = map(np.exp, compute_log_lambdas(betaMatrix,wi))
+      pt = build_bivariate_poisson_table(lambdas[0], lambdas[1], lambdas[2], nmax=10)
+      s1, s2 = scores_bivariate_poisson(pt)
+      print '%s %i | %s %i'%(hi['Country'], s1, lo['Country'], s2)
+      if s1 >= s2:
+        m['R16 W'].loc[m['Country']==hi['Country']] += 1 # FIXME need to handle ties!!
+      elif s1 < s2:
+        m['R16 W'].loc[m['Country']==lo['Country']] += 1
+      if i==1:
+        m['R16 idx'].loc[m['Country']==hi['Country']] += 1
+        m['R16 idx'].loc[m['Country']==lo['Country']] += 1
+
+  m_quarter = m[m['R16 W'] > 0]
+
+
+
 standard_features = ['Matches Played',
                      'Yellow_Per_Game_Avg', 
                      'YellowRed_Per_Game_Avg',
@@ -224,59 +431,30 @@ standard_features = ['Matches Played',
                      'seed',
                      'host',
                      'stars',
-                     'cohesion', 
-                     'dist', 
-                     'cohesion sans 1']
-
-def build_dataframes(diff=False):
-  m = Create_Feature_Matrix(dropboxDir, 
-                            match_data_file_location = dropboxDir + 'all_match_outcomes.csv',
-                            years = [2014,2010,2006,2002])
-  m.dropna(inplace=True)
-  features = m.loc[:, standard_features[0]+'_C1' : standard_features[-1]+'_C2']
-
-  scores = None
-  if diff == True:
-    scores = m['Score_Diff']
-  else:
-    scores = m[['Score1','Score2']]
-
-  return features, scores
+                     'cohesion',
+                     'cohesion sans 1',
+                     'dist']
 
 
-# NOTE for later:
-#                  BVP   IP  BVPD
-# scoreMatrix in   nx2  nx2   nx1
-# reg parameters     3    2     2
-
-
-# Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
-# to obtain the seeds, then creates brackets based on those seeds. Top 4 (?) teams
-# are 'protected' and don't play each other, rest are placed randomly.
-# NOTE: real draw for 2018 takes place Dec 1! Though, they might not do it randomly:
-# https://www.si.com/soccer/2017/11/14/world-cup-group-draw-pots-russia-2018
-# Could use random vs deterministic to infer how much of an advantage it is to be
-# one of the 'protected' seeds, especially the host nation.
-def create_tournament_seeds(featureMatrix):
-  pass
-
-
-# Perform the full tournament simulation. Need to look into details, but this should
-# involve group play followed by elimination rounds. For each matchup, use the model
-# to predict the score, and advance the winning teams until we have a winner.
-def simulate_tournament():
-  pass
-
+# Poisson model tests
 #tab = build_bivariate_poisson_table(lambda0=0.1, lambda1=1.0, lambda2=0.9, nmax=10)
 #scores_bivariate_poisson(tab)
 
-fm, sm = build_dataframes(diff=False)
-reg = score_regression(fm, sm, opt='linear')
+# Regression
+#reg = score_regression(fm, sm, opt='linear')
 #reg = score_regression(fm, sm, opt='ridge', alpha=0.5)
 #reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
-results = BVP_EM_algorithm(fm,sm)
 
+# Model selection
+#fm, sm = build_dataframes(base_features=['FIFA rank'])
+#betaMatrix, aic = BVP_EM_algorithm(fm,sm)
+#aicc = aic + 2*betaMatrix.size*(betaMatrix.size+1)/(1.0*(len(sm)-betaMatrix.size-1)) # disclaimer: some assumptions don't hold for this
+#cs, cw, r2 = validation_scores(betaMatrix, fm, sm)
+#print 'AIC; AICc; k; exact score rate; winner rate; r2; parameters:'
+#print '%.4f; %.4f; %i; %.4f; %.4f; %.4f;'%(aic, aicc, betaMatrix.size, cs, cw, r2), list(fm.columns)
 
+betaMatrix = np.array([[-1.842, -3.753], [-0.01, 0.019], [0.022, -0.014]])
+simulate_tournament(betaMatrix)
 
 
 
