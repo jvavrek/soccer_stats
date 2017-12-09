@@ -279,25 +279,28 @@ def build_dataframes(base_features=['Goal_Per_Game_Avg']):
   return features, scores
 
 
-# Simulate the seeding for the 2018 WC. Takes a featureMatrix (for the time being)
-# to obtain the seeds, then creates brackets based on those seeds. Top 4 (?) teams
-# are 'protected' and don't play each other, rest are placed randomly.
-# NOTE: real draw for 2018 takes place Dec 1! Though, they might not do it randomly:
-# https://www.si.com/soccer/2017/11/14/world-cup-group-draw-pots-russia-2018
-# Could use random vs deterministic to infer how much of an advantage it is to be
-# one of the 'protected' seeds, especially the host nation.
-def create_tournament_seeds(randomized=False):
+# Simulate the seeding for the 2018 WC. If randomized=False, read in the true groups.
+# If randomized=True, do the same, then randomize the group assignments.
+def create_tournament_brackets(randomized=False):
   m = pd.read_csv(dropboxDir+'2018'+'.csv')
-  m.dropna(inplace=True)
+  m.dropna(inplace=True, how='all') # FIXME need Aussie data!!!
   m.drop(['Seed - AW'], axis=1, inplace=True)
+  m.set_index('Country', inplace=True)
+
+  if randomized == True:
+    group_list = 4*['A','B','C','D','E','F','G','H']
+    np.random.shuffle(group_list)
+    print len(m), len(group_list)
+    m['Group'] = group_list
+
   return m
 
 
-# Perform the full tournament simulation. Need to look into details, but this should
-# involve group play followed by elimination rounds. For each matchup, use the model
-# to predict the score, and advance the winning teams until we have a winner.
-def simulate_tournament(betaMatrix):
-  m = create_tournament_seeds(randomized=False)
+# Perform the full tournament simulation. Simulates group play followed by elimination
+# rounds. For each matchup, use the model and betaMatrix to predict the score, and
+# advance the winning teams until we have a winner.
+def simulate_tournament(betaMatrix, model):
+  m = create_tournament_brackets(randomized=False)
   print 'm='
   print m
 
@@ -317,7 +320,7 @@ def simulate_tournament(betaMatrix):
     lambdas = map(np.exp, compute_log_lambdas(betaMatrix,wi))
     pt = build_bivariate_poisson_table(lambdas[0], lambdas[1], lambdas[2], nmax=10)
     s1, s2 = scores_bivariate_poisson(pt, break_ties)
-    print '%s %i | %s %i'%(t1['Country'], s1, t2['Country'], s2)
+    print '%s %i | %s %i'%(t1.name, s1, t2.name, s2)
     return s1, s2
 
   # Group play: everyone plays everyone in their pool
@@ -325,26 +328,26 @@ def simulate_tournament(betaMatrix):
   groups = pd.unique(m['Group'])
   for g in groups:
     group_data = m[m['Group'] == g]
-    teams = pd.unique(group_data['Country'])
+    teams = pd.unique(group_data.index)
     for i in xrange(len(teams)):
       for j in xrange(i+1,len(teams)):
         t1 = group_data.iloc[i]
         t2 = group_data.iloc[j]
         wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
         s1, s2 = simulate_match(t1, t2, wi, break_ties=False)
-        m['Group GF'].loc[m['Country']==t1['Country']] += s1  # there has got to be a better/faster way to do this...
-        m['Group GA'].loc[m['Country']==t1['Country']] += s2
-        m['Group GF'].loc[m['Country']==t2['Country']] += s2
-        m['Group GA'].loc[m['Country']==t2['Country']] += s1
+        m['Group GF'].loc[t1.name] += s1
+        m['Group GA'].loc[t1.name] += s2
+        m['Group GF'].loc[t2.name] += s2
+        m['Group GA'].loc[t2.name] += s1
         if s1 > s2:
-          m['Group W'].loc[m['Country']==t1['Country']] += 1
-          m['Group L'].loc[m['Country']==t2['Country']] += 1
+          m['Group W'].loc[t1.name] += 1
+          m['Group L'].loc[t2.name] += 1
         elif s2 > s1:
-          m['Group L'].loc[m['Country']==t1['Country']] += 1
-          m['Group W'].loc[m['Country']==t2['Country']] += 1
+          m['Group L'].loc[t1.name] += 1
+          m['Group W'].loc[t2.name] += 1
         else:
-          m['Group T'].loc[m['Country']==t1['Country']] += 1
-          m['Group T'].loc[m['Country']==t2['Country']] += 1
+          m['Group T'].loc[t1.name] += 1
+          m['Group T'].loc[t2.name] += 1
 
   m.sort_values(['Group', 'Group W', 'Group GF'], ascending=[True,False,False], inplace=True)
   m.reset_index(inplace=True)
@@ -357,6 +360,8 @@ def simulate_tournament(betaMatrix):
   # R16: A1 plays B2, A2 plays B1, etc
   print 'Beginning round of 16...'
   m_sixteen = m[m.index%4<=1]
+  m_sixteen.set_index('Country', inplace=True)
+  m.set_index('Country', inplace=True)
   groups = pd.unique(m_sixteen['Group'])
   for g in xrange(0, len(groups)-1, 2):
     this_group = m_sixteen[m_sixteen['Group'] == groups[g]]
@@ -373,14 +378,14 @@ def simulate_tournament(betaMatrix):
       wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
       if s1 > s2:
-        m['R16 W'].loc[m['Country']==t1['Country']] += 1
+        m['R16 W'].loc[t1.name] += 1
       elif s1 < s2:
-        m['R16 W'].loc[m['Country']==t2['Country']] += 1
+        m['R16 W'].loc[t2.name] += 1
       else:
         print 'TIE!'
       if i==1:
-        m['R16 brac'].loc[m['Country']==t1['Country']] += 1
-        m['R16 brac'].loc[m['Country']==t2['Country']] += 1
+        m['R16 brac'].loc[t1.name] += 1
+        m['R16 brac'].loc[t2.name] += 1
 
 
   print 'Beginning quarter finals...'
@@ -403,14 +408,14 @@ def simulate_tournament(betaMatrix):
       wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
       if s1 > s2:
-        m['Qtr W'].loc[m['Country']==t1['Country']] += 1
+        m['Qtr W'].loc[t1.name] += 1
       elif s1 < s2:
-        m['Qtr W'].loc[m['Country']==t2['Country']] += 1
+        m['Qtr W'].loc[t2.name] += 1
       else:
         print 'TIE!'
       if i==1:
-        m['Qtr brac'].loc[m['Country']==t1['Country']] += 1 # FIXME unsure if this is right
-        m['Qtr brac'].loc[m['Country']==t2['Country']] += 1
+        m['Qtr brac'].loc[t1.name] += 1
+        m['Qtr brac'].loc[t2.name] += 1 # FIXME unsure if rule is right for crossover
 
 
   # Semis
@@ -423,9 +428,9 @@ def simulate_tournament(betaMatrix):
     wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
     s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
     if s1 > s2:
-      m['Semi W'].loc[m['Country']==t1['Country']] += 1
+      m['Semi W'].loc[t1.name] += 1
     elif s1 < s2:
-      m['Semi W'].loc[m['Country']==t2['Country']] += 1
+      m['Semi W'].loc[t2.name] += 1
     else:
       print 'TIE!'
 
@@ -440,16 +445,16 @@ def simulate_tournament(betaMatrix):
   wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
   s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
   if s1 > s2:
-    m['Final W'].loc[m['Country']==t1['Country']] += 1
+    m['Final W'].loc[t1.name] += 1
   elif s1 < s2:
-    m['Final W'].loc[m['Country']==t2['Country']] += 1
+    m['Final W'].loc[t2.name] += 1
   else:
     print 'TIE!' 
 
   print m_finals
   print m
 
-  print 'Winner:', m[m['Final W']==1]['Country'].values[0]
+  print 'Winner:', m[m['Final W']==1].index[0]
 
   return m
 
@@ -489,11 +494,7 @@ standard_features = ['Matches Played',
 #print '%.4f; %.4f; %i; %.4f; %.4f; %.4f;'%(aic, aicc, betaMatrix.size, cs, cw, r2), list(fm.columns)
 
 betaMatrix = np.array([[-1.842, -3.753], [-0.01, 0.019], [0.022, -0.014]])
-m = simulate_tournament(betaMatrix)
-
-
-# need Manon to update stars
-# could also delete 'seed - AW' column
+m = simulate_tournament(betaMatrix,None)
 
 
 
