@@ -283,7 +283,7 @@ def build_dataframes(base_features=['Goal_Per_Game_Avg']):
 # If randomized=True, do the same, then randomize the group assignments.
 def create_tournament_brackets(randomized=False):
   m = pd.read_csv(dropboxDir+'2018'+'.csv')
-  m.dropna(inplace=True, how='all') # FIXME need Aussie data!!!
+  m.dropna(inplace=True)
   m.drop(['Seed - AW'], axis=1, inplace=True)
   m.set_index('Country', inplace=True)
 
@@ -297,10 +297,10 @@ def create_tournament_brackets(randomized=False):
 
 
 # Perform the full tournament simulation. Simulates group play followed by elimination
-# rounds. For each matchup, use the model and betaMatrix to predict the score, and
-# advance the winning teams until we have a winner.
-def simulate_tournament(betaMatrix, model):
-  m = create_tournament_brackets(randomized=False)
+# rounds. For each matchup, use the base_features and betaMatrix to predict the score,
+# and advance the winning teams until we have a winner.
+def simulate_tournament(betaMatrix, base_features=['seed','host'], randomized=False):
+  m = create_tournament_brackets(randomized=randomized)
   print 'm='
   print m
 
@@ -316,6 +316,14 @@ def simulate_tournament(betaMatrix, model):
   m['Semi W'] = 0
   m['Final W'] = 0
 
+  def build_wi(t1, t2, base_features):
+    wi = []
+    for ft in base_features:
+      wi.append(t1[ft])
+    for ft in base_features:
+      wi.append(t2[ft])
+    return np.array(wi)
+
   def simulate_match(t1, t2, wi, break_ties=False):
     lambdas = map(np.exp, compute_log_lambdas(betaMatrix,wi))
     pt = build_bivariate_poisson_table(lambdas[0], lambdas[1], lambdas[2], nmax=10)
@@ -324,7 +332,7 @@ def simulate_tournament(betaMatrix, model):
     return s1, s2
 
   # Group play: everyone plays everyone in their pool
-  print 'Beginning group play...'
+  print '\nBeginning group play...'
   groups = pd.unique(m['Group'])
   for g in groups:
     group_data = m[m['Group'] == g]
@@ -333,7 +341,7 @@ def simulate_tournament(betaMatrix, model):
       for j in xrange(i+1,len(teams)):
         t1 = group_data.iloc[i]
         t2 = group_data.iloc[j]
-        wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
+        wi = build_wi(t1, t2, base_features)
         s1, s2 = simulate_match(t1, t2, wi, break_ties=False)
         m['Group GF'].loc[t1.name] += s1
         m['Group GA'].loc[t1.name] += s2
@@ -358,7 +366,7 @@ def simulate_tournament(betaMatrix, model):
   # Only top two teams from each pool advance to round of 16, then single knockout.
 
   # R16: A1 plays B2, A2 plays B1, etc
-  print 'Beginning round of 16...'
+  print '\nBeginning round of 16...'
   m_sixteen = m[m.index%4<=1]
   m_sixteen.set_index('Country', inplace=True)
   m.set_index('Country', inplace=True)
@@ -375,7 +383,7 @@ def simulate_tournament(betaMatrix, model):
         t1 = chal_group.iloc[0]
         t2 = this_group.iloc[1]
   
-      wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
+      wi = build_wi(t1, t2, base_features)
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
       if s1 > s2:
         m['R16 W'].loc[t1.name] += 1
@@ -388,7 +396,7 @@ def simulate_tournament(betaMatrix, model):
         m['R16 brac'].loc[t2.name] += 1
 
 
-  print 'Beginning quarter finals...'
+  print '\nBeginning quarter finals...'
   m_quarter = m[m['R16 W'] > 0]
   print m_quarter
   # Quarter finals, eight teams remaining.
@@ -405,7 +413,7 @@ def simulate_tournament(betaMatrix, model):
       subgroup = g[g['R16 brac']==i]
       t1 = subgroup.iloc[0]
       t2 = subgroup.iloc[1]
-      wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
+      wi = build_wi(t1, t2, base_features)
       s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
       if s1 > s2:
         m['Qtr W'].loc[t1.name] += 1
@@ -419,13 +427,13 @@ def simulate_tournament(betaMatrix, model):
 
 
   # Semis
-  print 'Beginning semi finals...'
+  print '\nBeginning semi finals...'
   m_semi = m[m['Qtr W'] > 0]
   for i in [0,1]:
     subgroup = m_semi[m_semi['Qtr brac']==i]
     t1 = subgroup.iloc[0]
     t2 = subgroup.iloc[1]
-    wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
+    wi = build_wi(t1, t2, base_features)
     s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
     if s1 > s2:
       m['Semi W'].loc[t1.name] += 1
@@ -438,11 +446,11 @@ def simulate_tournament(betaMatrix, model):
 
 
   # FINALS!!
-  print 'Beginning finals...'
+  print '\nBeginning finals...'
   m_finals = m[m['Semi W'] > 0]
   t1 = m_finals.iloc[0]
   t2 = m_finals.iloc[1]
-  wi = np.array([t1['seed'], t2['seed']]) # FIXME temporary hack
+  wi = build_wi(t1, t2, base_features)
   s1, s2 = simulate_match(t1, t2, wi, break_ties=True)
   if s1 > s2:
     m['Final W'].loc[t1.name] += 1
@@ -454,10 +462,41 @@ def simulate_tournament(betaMatrix, model):
   print m_finals
   print m
 
-  print 'Winner:', m[m['Final W']==1].index[0]
+  winner = m[m['Final W']==1].index[0]
+  second = m[(m['Semi W']==1) & (m['Final W']==0)].index[0]
+  semis_list = m[m['Qtr W']==1].index.values
 
-  return m
+  print 'Winner:', winner
+  print 'Second:', second
+  print 'Semis:', semis_list
 
+  return m, winner, semis_list
+
+
+def MC_sample_tournament(betaMatrix, base_features=['seed','host'], randomized=False, trials=100):
+  fname_w = 'winners'
+  fname_s = 'semis'
+  if randomized == True:
+    fname_w += '_rand'
+    fname_s += '_rand'
+  else:
+    fname_w += '_fixed'
+    fname_s += '_fixed'
+  fname_w += '.txt'
+  fname_s += '.txt'
+
+  fw = open(fname_w,'w')
+  fs = open(fname_s,'w')
+
+  for i in xrange(trials):
+    m, winner, semis_list = simulate_tournament(betaMatrix, base_features, randomized)
+    fw.write(winner+'\n')
+    for s in semis_list:
+      fs.write(s+'\n')
+
+  fw.close()
+  fs.close()
+  print 'Files %s, %s written'%(fname_w, fname_s)
 
 
 standard_features = ['Matches Played',
@@ -486,15 +525,22 @@ standard_features = ['Matches Played',
 #reg = score_regression(fm, sm, opt='lasso', alpha=0.5)
 
 # Model selection
-#fm, sm = build_dataframes(base_features=['FIFA rank'])
+#fm, sm = build_dataframes(base_features=['seed','host'])
 #betaMatrix, aic = BVP_EM_algorithm(fm,sm)
 #aicc = aic + 2*betaMatrix.size*(betaMatrix.size+1)/(1.0*(len(sm)-betaMatrix.size-1)) # disclaimer: some assumptions don't hold for this
 #cs, cw, r2 = validation_scores(betaMatrix, fm, sm)
 #print 'AIC; AICc; k; exact score rate; winner rate; r2; parameters:'
 #print '%.4f; %.4f; %i; %.4f; %.4f; %.4f;'%(aic, aicc, betaMatrix.size, cs, cw, r2), list(fm.columns)
 
-betaMatrix = np.array([[-1.842, -3.753], [-0.01, 0.019], [0.022, -0.014]])
-m = simulate_tournament(betaMatrix,None)
+betaMatrix_seed = np.array([[-1.94, -1.677],
+                            [-0.016, 0.028],
+                            [0.041, -0.025]])
+
+betaMatrix_seedhost = np.array([[ -1.982e+00,   2.105e+01,  -1.737e+00,   1.336e+01],
+                                [ -1.835e-02,  -3.072e-01,   2.987e-02,  -2.531e+02],
+                                [  3.602e-02,  -2.729e+02,  -1.959e-02,   9.153e-02]])
+#m = simulate_tournament(betaMatrix_seedhost,['seed','host'])
+MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=False, trials=3)
 
 
 
