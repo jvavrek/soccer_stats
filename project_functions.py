@@ -21,7 +21,8 @@ def Create_Feature_Matrix(directory,
                                               'stars', 
                                               'cohesion',
                                               'cohesion sans 1', 
-                                              'dist']):
+                                              'dist',
+                                              'Prev Appearance']):
     match_data =  pd.DataFrame.from_csv(match_data_file_location)
     feature_matrix = pd.DataFrame()
 

@@ -500,24 +500,43 @@ def MC_sample_tournament(betaMatrix, base_features=['seed','host'], randomized=F
   print 'Files %s, %s written'%(fname_w, fname_s)
 
 
-def analyze_MC_samples(team_list, file_w = 'winners_fixed.txt', file_s = 'semis_fixed.txt'):
+def analyze_MC_samples(team_list, file_w = 'results/winners_fixed_seed.txt', file_s = 'results/semis_fixed_seed.txt'):
   lw = open(file_w).read()
   dw = {}
   for team in team_list:
     countw = lw.count(team)
     dw[team] = countw
-  dw = sorted(dw.items(), key=operator.itemgetter(1), reverse=True)
-  print 'winners:'
+  dw = sorted(dw.items(), key=operator.itemgetter(0), reverse=False)
+  print 'winners, from %s:'%file_w
   print dw
+  print
 
   ls = open(file_s).read()
   ds = {}
   for team in team_list:
     counts = ls.count(team)
     ds[team] = counts
-  ds = sorted(ds.items(), key=operator.itemgetter(1), reverse=True)
-  print 'semis:'
+  ds = sorted(ds.items(), key=operator.itemgetter(0), reverse=False)
+  print 'semis, from %s:'%file_s
   print ds
+
+  return dw
+
+
+def generate_plots(dw_fixed, dw_random):
+  win_frac_fixed  = [i[1] for i in dw_fixed]
+  win_frac_random = [i[1] for i in dw_random]
+  labels = [i[0] for i in dw_random]
+  nums = range(len(dw_fixed))
+
+  plt.bar(nums, win_frac_fixed,  color='b', alpha=0.5, width=1.0, align='center')
+  plt.bar(nums, win_frac_random, color='r', alpha=0.5, width=1.0, align='center')
+  plt.legend(['true seeding','randomized seeding'])
+  plt.xticks(nums, [x[0] for x in dw_fixed], rotation='vertical')
+  plt.ylabel('World Cup 2018 wins in 100 simulations')
+  plt.xlim([-0.5,len(dw_fixed)-0.5])
+  plt.subplots_adjust(bottom=0.21)
+  plt.show(block=False)
 
 # screw it, make some globals
 countries_2018 = ['Uruguay', 'Egypt', 'Russia', 'Saudi Arabia', 'Portugal',
@@ -567,8 +586,11 @@ betaMatrix_seed = np.array([[-1.94, -1.677],
 betaMatrix_seedhost = np.array([[ -1.982e+00,   2.105e+01,  -1.737e+00,   1.336e+01],
                                 [ -1.835e-02,  -3.072e-01,   2.987e-02,  -2.531e+02],
                                 [  3.602e-02,  -2.729e+02,  -1.959e-02,   9.153e-02]])
-#m, winner, semis_list = simulate_tournament(betaMatrix_seedhost,['seed','host'])
-MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=True, trials=100)
+#m, winner, semis_list = simulate_tournament(betaMatrix_seedhost,['seed','host'], randomized=False)
+#MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=True, trials=100)
 
-#analyze_MC_samples(countries_2018, file_w='winners_rand_seed.txt', file_s='semis_rand_seed.txt')
+dw_fixed  = analyze_MC_samples(countries_2018, file_w='results/winners_fixed_seed.txt', file_s='results/semis_fixed_seed.txt')
+dw_random = analyze_MC_samples(countries_2018, file_w='results/winners_rand_seed.txt',  file_s='results/semis_rand_seed.txt')
+
+generate_plots(dw_fixed, dw_random)
 
