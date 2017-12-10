@@ -423,7 +423,7 @@ def simulate_tournament(betaMatrix, base_features=['seed','host'], randomized=Fa
         print 'TIE!'
       if i==1:
         m['Qtr brac'].loc[t1.name] += 1
-        m['Qtr brac'].loc[t2.name] += 1 # FIXME unsure if rule is right for crossover
+        m['Qtr brac'].loc[t2.name] += 1
 
 
   # Semis
@@ -540,7 +540,7 @@ betaMatrix_seedhost = np.array([[ -1.982e+00,   2.105e+01,  -1.737e+00,   1.336e
                                 [ -1.835e-02,  -3.072e-01,   2.987e-02,  -2.531e+02],
                                 [  3.602e-02,  -2.729e+02,  -1.959e-02,   9.153e-02]])
 #m = simulate_tournament(betaMatrix_seedhost,['seed','host'])
-MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=False, trials=3)
+MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=False, trials=1)
 
 
 
