@@ -5,6 +5,7 @@
 # MC sample initial distribution
 
 import sys
+import operator
 import numpy as np
 import scipy as sp
 import scipy.misc
@@ -290,7 +291,6 @@ def create_tournament_brackets(randomized=False):
   if randomized == True:
     group_list = 4*['A','B','C','D','E','F','G','H']
     np.random.shuffle(group_list)
-    print len(m), len(group_list)
     m['Group'] = group_list
 
   return m
@@ -489,6 +489,7 @@ def MC_sample_tournament(betaMatrix, base_features=['seed','host'], randomized=F
   fs = open(fname_s,'w')
 
   for i in xrange(trials):
+    print 'TRIAL %i'%i
     m, winner, semis_list = simulate_tournament(betaMatrix, base_features, randomized)
     fw.write(winner+'\n')
     for s in semis_list:
@@ -498,6 +499,33 @@ def MC_sample_tournament(betaMatrix, base_features=['seed','host'], randomized=F
   fs.close()
   print 'Files %s, %s written'%(fname_w, fname_s)
 
+
+def analyze_MC_samples(team_list, file_w = 'winners_fixed.txt', file_s = 'semis_fixed.txt'):
+  lw = open(file_w).read()
+  dw = {}
+  for team in team_list:
+    countw = lw.count(team)
+    dw[team] = countw
+  dw = sorted(dw.items(), key=operator.itemgetter(1), reverse=True)
+  print 'winners:'
+  print dw
+
+  ls = open(file_s).read()
+  ds = {}
+  for team in team_list:
+    counts = ls.count(team)
+    ds[team] = counts
+  ds = sorted(ds.items(), key=operator.itemgetter(1), reverse=True)
+  print 'semis:'
+  print ds
+
+# screw it, make some globals
+countries_2018 = ['Uruguay', 'Egypt', 'Russia', 'Saudi Arabia', 'Portugal',
+                  'Morocco', 'Spain', 'Iran', 'France', 'Denmark', 'Peru',
+                  'Australia', 'Argentina', 'Iceland', 'Nigeria', 'Croatia',
+                  'Switzerland', 'Brazil', 'Costa Rica', 'Serbia', 'Germany',
+                  'Mexico', 'Sweden', 'Korea Republic', 'Belgium', 'Panama',
+                  'England', 'Tunisia', 'Poland', 'Senegal', 'Colombia', 'Japan']
 
 standard_features = ['Matches Played',
                      'Yellow_Per_Game_Avg', 
@@ -539,8 +567,8 @@ betaMatrix_seed = np.array([[-1.94, -1.677],
 betaMatrix_seedhost = np.array([[ -1.982e+00,   2.105e+01,  -1.737e+00,   1.336e+01],
                                 [ -1.835e-02,  -3.072e-01,   2.987e-02,  -2.531e+02],
                                 [  3.602e-02,  -2.729e+02,  -1.959e-02,   9.153e-02]])
-#m = simulate_tournament(betaMatrix_seedhost,['seed','host'])
-MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=False, trials=1)
+#m, winner, semis_list = simulate_tournament(betaMatrix_seedhost,['seed','host'])
+MC_sample_tournament(betaMatrix_seedhost, base_features=['seed','host'], randomized=True, trials=100)
 
-
+#analyze_MC_samples(countries_2018, file_w='winners_rand_seed.txt', file_s='semis_rand_seed.txt')
 
